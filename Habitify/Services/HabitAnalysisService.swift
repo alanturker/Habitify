@@ -61,7 +61,7 @@ final class HabitAnalysisService {
         guard !habit.completions.isEmpty else { return 0 }
         
         let startOfToday = calendar.startOfDay(for: today)
-        let scheduledWeekdays = Set(habit.weeklyDays)
+        let scheduledWeekdays = Set(habit.weeklyDays.map { $0.dayNumber })
         guard !scheduledWeekdays.isEmpty else { return 0 }
         
         let weekday = calendar.component(.weekday, from: startOfToday)
@@ -146,10 +146,10 @@ final class HabitAnalysisService {
             return true
         case .weekly:
             let weekday = calendar.component(.weekday, from: date)
-            return habit.weeklyDays.contains(weekday)
+            return habit.weeklyDays.contains { $0.dayNumber == weekday }
         case .monthly:
             let day = calendar.component(.day, from: date)
-            return habit.monthlyDays.contains(day)
+            return habit.monthlyDays.contains { $0.dayNumber == day }
         }
     }
     
@@ -180,7 +180,7 @@ final class HabitAnalysisService {
             // For weekly habits, check if all scheduled days in the week are completed
             let scheduledDaysInWeek = weekDays.filter { weekDate in
                 let dayOfWeek = calendar.component(.weekday, from: weekDate)
-                return habit.weeklyDays.contains(dayOfWeek)
+                return habit.weeklyDays.contains { $0.dayNumber == dayOfWeek }
             }
             
             let completedDaysInWeek = scheduledDaysInWeek.filter { weekDate in
@@ -192,7 +192,7 @@ final class HabitAnalysisService {
             // For monthly habits, check if all scheduled days in the week are completed
             let scheduledDaysInWeek = weekDays.filter { weekDate in
                 let dayOfMonth = calendar.component(.day, from: weekDate)
-                return habit.monthlyDays.contains(dayOfMonth)
+                return habit.monthlyDays.contains { $0.dayNumber == dayOfMonth }
             }
             
             let completedDaysInWeek = scheduledDaysInWeek.filter { weekDate in
@@ -224,13 +224,13 @@ final class HabitAnalysisService {
             // For weekly habits, only days that match the weekly schedule
             scheduledDaysInMonth = monthDays.filter { monthDate in
                 let dayOfWeek = calendar.component(.weekday, from: monthDate)
-                return habit.weeklyDays.contains(dayOfWeek)
+                return habit.weeklyDays.contains { $0.dayNumber == dayOfWeek }
             }
         case .monthly:
             // For monthly habits, only specific days of the month
             scheduledDaysInMonth = monthDays.filter { monthDate in
                 let dayOfMonth = calendar.component(.day, from: monthDate)
-                return habit.monthlyDays.contains(dayOfMonth)
+                return habit.monthlyDays.contains { $0.dayNumber == dayOfMonth }
             }
         }
         

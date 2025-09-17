@@ -14,7 +14,7 @@ struct HabitifyApp: App {
         WindowGroup {
             HabitListView()
         }
-        .modelContainer(for: [Habit.self, HabitCompletion.self])
+        .modelContainer(for: [Habit.self, HabitCompletion.self, WeeklyDay.self, MonthlyDay.self])
     }
 }
 

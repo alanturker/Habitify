@@ -71,8 +71,8 @@ struct HabitMonthlyView: View {
             
             // Weekday headers
             HStack {
-                ForEach(["M","T","W","T","F","S","S"], id: \.self) { d in
-                    Text(d)
+                ForEach(["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], id: \.self) { day in
+                    Text(day)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)

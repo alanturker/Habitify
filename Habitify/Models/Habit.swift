@@ -18,8 +18,10 @@ final class Habit {
     
     // Scheduling
     var frequencyRaw: Int // Frequency.rawValue
-    var weeklyDays: [Int] // 1...7 (Sunday=1)
-    var monthlyDays: [Int] // 1...31
+    @Relationship(deleteRule: .cascade)
+    var weeklyDays: [WeeklyDay] = []
+    @Relationship(deleteRule: .cascade)
+    var monthlyDays: [MonthlyDay] = []
     
     @Relationship(deleteRule: .cascade)
     var completions: [HabitCompletion] = []

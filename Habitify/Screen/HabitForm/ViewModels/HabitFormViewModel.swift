@@ -117,10 +117,10 @@ final class HabitFormViewModel: ObservableObject {
         selectedIcon = habit.iconName
         frequency = Frequency(rawValue: habit.frequencyRaw) ?? .daily
         originalFrequency = frequency
-        selectedWeekdays = Set(habit.weeklyDays.compactMap { Weekday(rawValue: $0) })
+        selectedWeekdays = Set(habit.weeklyDays.compactMap { Weekday(rawValue: $0.dayNumber) })
         monthlySelectedDates = Set(habit.monthlyDays.compactMap { day in
             var comps = Calendar.current.dateComponents([.year, .month], from: Date())
-            comps.day = day
+            comps.day = day.dayNumber
             return Calendar.current.date(from: comps).map { Calendar.current.startOfDay(for: $0) }
         })
     }
@@ -149,13 +149,19 @@ final class HabitFormViewModel: ObservableObject {
         }
         
         // Check if weekly days changed
-        if newFrequency == .weekly && habit.weeklyDays != newWeeklyDays {
-            return true
+        if newFrequency == .weekly {
+            let currentWeeklyDays = Set(habit.weeklyDays.map { $0.dayNumber }).sorted()
+            if currentWeeklyDays != newWeeklyDays {
+                return true
+            }
         }
         
         // Check if monthly days changed
-        if newFrequency == .monthly && habit.monthlyDays != newMonthlyDays {
-            return true
+        if newFrequency == .monthly {
+            let currentMonthlyDays = Set(habit.monthlyDays.map { $0.dayNumber }).sorted()
+            if currentMonthlyDays != newMonthlyDays {
+                return true
+            }
         }
         
         return false
@@ -175,7 +181,7 @@ final class HabitFormViewModel: ObservableObject {
     
     private func cleanUpOldCompletions(habit: Habit, newFrequency: Frequency, newWeeklyDays: [Int], newMonthlyDays: [Int]) {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let _ = calendar.startOfDay(for: Date())
         
         // Get all completions
         let completions = habit.completions

@@ -25,8 +25,13 @@ final class HabitService: ObservableObject {
     func createHabit(name: String, colorHex: String, iconName: String, frequency: Frequency, weeklyDays: [Int], monthlyDays: [Int]) {
         let habit = Habit(name: name, colorHex: colorHex, iconName: iconName)
         habit.frequencyRaw = frequency.rawValue
-        habit.weeklyDays = weeklyDays
-        habit.monthlyDays = monthlyDays
+        
+        // Create WeeklyDay objects
+        habit.weeklyDays = weeklyDays.map { WeeklyDay(dayNumber: $0) }
+        
+        // Create MonthlyDay objects
+        habit.monthlyDays = monthlyDays.map { MonthlyDay(dayNumber: $0) }
+        
         modelContext.insert(habit)
         saveContext()
     }
@@ -36,8 +41,17 @@ final class HabitService: ObservableObject {
         habit.colorHex = colorHex
         habit.iconName = iconName
         habit.frequencyRaw = frequency.rawValue
-        habit.weeklyDays = weeklyDays
-        habit.monthlyDays = monthlyDays
+        
+        // Clear existing days
+        habit.weeklyDays.removeAll()
+        habit.monthlyDays.removeAll()
+        
+        // Create new WeeklyDay objects
+        habit.weeklyDays = weeklyDays.map { WeeklyDay(dayNumber: $0) }
+        
+        // Create new MonthlyDay objects
+        habit.monthlyDays = monthlyDays.map { MonthlyDay(dayNumber: $0) }
+        
         saveContext()
     }
     

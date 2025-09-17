@@ -33,7 +33,7 @@ struct CalendarMonthView: View {
             
             // Weekday headers
             HStack {
-                ForEach(["S","M","T","W","T","F","S"], id: \.self) { d in
+                ForEach(["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], id: \.self) { d in
                     Text(d).font(.caption).foregroundColor(.secondary).frame(maxWidth: .infinity)
                 }
             }

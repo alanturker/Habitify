@@ -6,12 +6,16 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct HabitifyApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            HabitListView()
         }
+        .modelContainer(for: [Habit.self, HabitCompletion.self])
     }
 }
+
+

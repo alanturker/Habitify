@@ -112,9 +112,6 @@ final class HabitListViewModel: ObservableObject {
         analysisService.isCompleted(habit, on: date)
     }
     
-    func isCompletedToday(_ habit: Habit, today: Date = Date()) -> Bool {
-        analysisService.isCompletedToday(habit, today: today)
-    }
     
     func currentStreak(for habit: Habit, today: Date = Date()) -> Int {
         analysisService.currentStreak(for: habit, today: today)
@@ -122,6 +119,12 @@ final class HabitListViewModel: ObservableObject {
     
     func weeklyStreak(for habit: Habit, today: Date = Date()) -> Int {
         analysisService.weeklyStreak(for: habit, today: today)
+    }
+    
+    func habitsForDate(_ habits: [Habit], on date: Date) -> [Habit] {
+        return habits.filter { habit in
+            analysisService.isScheduled(habit, on: date)
+        }
     }
     
     func streakText(for habit: Habit, today: Date = Date()) -> String {
@@ -175,11 +178,6 @@ final class HabitListViewModel: ObservableObject {
         }
     }
     
-    func habitsForDate(_ habits: [Habit], on date: Date) -> [Habit] {
-        return habits.filter { habit in
-            analysisService.isScheduled(habit, on: date)
-        }
-    }
     
     // MARK: - Date Utilities
     func isSameDay(_ lhs: Date, _ rhs: Date) -> Bool {

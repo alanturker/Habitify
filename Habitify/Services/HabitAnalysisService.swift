@@ -13,7 +13,6 @@ final class HabitAnalysisService {
     private let calendar = Calendar.current
     
     // MARK: - Caching
-    private var completionCache: [String: Bool] = [:]
     private var streakCache: [String: Int] = [:]
     private var scheduledCache: [String: Bool] = [:]
     
@@ -33,10 +32,6 @@ final class HabitAnalysisService {
         return result
     }
     
-    func isCompletedToday(_ habit: Habit, today: Date = Date()) -> Bool {
-        let startOfToday = calendar.startOfDay(for: today)
-        return isCompleted(habit, on: startOfToday)
-    }
     
     // MARK: - Streak Calculations
     func currentStreak(for habit: Habit, today: Date = Date()) -> Int {
@@ -57,7 +52,7 @@ final class HabitAnalysisService {
         var streak = 0
         var currentDate = startOfToday
         
-        if !isCompletedToday(habit, today: today) {
+        if !isCompleted(habit, on: startOfToday) {
             currentDate = calendar.date(byAdding: .day, value: -1, to: startOfToday) ?? startOfToday
         }
         
@@ -292,42 +287,14 @@ final class HabitAnalysisService {
     
     // MARK: - Cache Management
     func clearCache() {
-        completionCache.removeAll(keepingCapacity: true)
         streakCache.removeAll(keepingCapacity: true)
         scheduledCache.removeAll(keepingCapacity: true)
     }
     
     func clearCache(for habit: Habit) {
         let habitId = habit.id.uuidString
-        completionCache = completionCache.filter { !$0.key.hasPrefix(habitId) }
         streakCache = streakCache.filter { !$0.key.hasPrefix(habitId) }
         scheduledCache = scheduledCache.filter { !$0.key.hasPrefix(habitId) }
-        
-        // Also clear any date-specific caches for this habit
-        let today = Calendar.current.startOfDay(for: Date())
-        let todayKey = "\(habitId)-\(today.timeIntervalSince1970)"
-        completionCache.removeValue(forKey: todayKey)
-        completionCache.removeValue(forKey: "\(todayKey)-scheduled")
     }
     
-    // Clear old cache entries to prevent memory buildup
-    func cleanupOldCache() {
-        // Keep only recent entries (last 30 days)
-        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-        let cutoffTime = thirtyDaysAgo.timeIntervalSince1970
-        
-        completionCache = completionCache.filter { key, _ in
-            if let timeInterval = Double(key.components(separatedBy: "-").last ?? "0") {
-                return timeInterval >= cutoffTime
-            }
-            return true
-        }
-        
-        scheduledCache = scheduledCache.filter { key, _ in
-            if let timeInterval = Double(key.components(separatedBy: "-").last ?? "0") {
-                return timeInterval >= cutoffTime
-            }
-            return true
-        }
-    }
 }

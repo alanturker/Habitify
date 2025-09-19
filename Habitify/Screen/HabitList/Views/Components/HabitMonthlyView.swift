@@ -80,7 +80,7 @@ struct HabitMonthlyView: View {
             }
             
             // Month grid with scheduled/completed indications
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
                 ForEach(calendarGrid.indices, id: \.self) { idx in
                     if let date = calendarGrid[idx] {
                         MonthDayView(
@@ -93,7 +93,7 @@ struct HabitMonthlyView: View {
                     } else {
                         // Empty cell for days before the month starts
                         Color.clear
-                            .frame(height: 26)
+                            .frame(height: 22)
                     }
                 }
             }
@@ -125,11 +125,11 @@ private struct MonthDayView: View {
         ZStack {
             Circle()
                 .fill(isCompleted ? habitColor : Color.gray.opacity(0.15))
-                .frame(width: 26, height: 26)
+                .frame(width: 24, height: 24) // Reduced size
                 .overlay(
                     Circle().stroke(
                         isScheduled ? habitColor : Color.clear, 
-                        lineWidth: isScheduled ? (isToday ? 2 : 1) : 0
+                        lineWidth: isScheduled ? (isToday ? 1.5 : 1) : 0
                     )
                 )
             if isCompleted {
@@ -140,29 +140,30 @@ private struct MonthDayView: View {
                 // Show day number with a subtle indicator for completion
                 VStack(spacing: 1) {
                     Text(DateService.shared.dayNumber(for: date))
-                        .font(.footnote)
+                        .font(.caption2)
                         .foregroundColor(.primary)
                     Circle()
                         .fill(habitColor)
-                        .frame(width: 4, height: 4)
+                        .frame(width: 3, height: 3)
                 }
             } else {
                 Text(DateService.shared.dayNumber(for: date))
-                    .font(.footnote)
+                    .font(.caption2)
                     .foregroundColor(.primary)
             }
         }
         .onTapGesture {
             guard canToggle else { return }
-            withAnimation {
-                onToggleCompletion()
-                updateState()
-            }
+            // Immediate response without any delays
+            onToggleCompletion()
+            // Immediate state update on main thread
+            updateState()
         }
         .onAppear {
             updateState()
         }
         .onChange(of: habit.completions) { _, _ in
+            // Immediate update without delay
             updateState()
         }
         .onChange(of: habit.frequencyRaw) { _, _ in
@@ -177,10 +178,29 @@ private struct MonthDayView: View {
     }
     
     private func updateState() {
-        let analysisService = HabitAnalysisService.shared
-        isScheduled = analysisService.isScheduled(habit, on: date)
-        isCompleted = analysisService.isCompleted(habit, on: date)
-        canToggle = analysisService.canToggleCompletion(habit, on: date)
+        // Use direct calculation without cache to prevent hang
+        let calendar = Calendar.current
+        
+        // Direct completion check
+        isCompleted = habit.completions.contains { completion in
+            calendar.isDate(completion.date, inSameDayAs: date)
+        }
+        
+        // Direct schedule check
+        let frequency = Frequency(rawValue: habit.frequencyRaw) ?? .daily
+        switch frequency {
+        case .daily:
+            isScheduled = true
+        case .weekly:
+            let weekday = calendar.component(.weekday, from: date)
+            isScheduled = habit.weeklyDays.contains { $0.dayNumber == weekday }
+        case .monthly:
+            let day = calendar.component(.day, from: date)
+            isScheduled = habit.monthlyDays.contains { $0.dayNumber == day }
+        }
+        
+        // Direct canToggle check
+        canToggle = isScheduled && DateService.shared.isPastOrToday(date)
         isToday = DateService.shared.isSameDay(date, Date())
     }
 }

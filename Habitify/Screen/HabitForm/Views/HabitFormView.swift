@@ -17,8 +17,8 @@ struct HabitFormView: View {
     
     init(habit: Habit?) {
         self.habit = habit
-        // Initialize with a temporary service
-        let tempContainer = try! ModelContainer(for: Habit.self, HabitCompletion.self)
+        // Initialize with a temporary service - this will be updated in onAppear
+        let tempContainer = try! ModelContainer(for: Habit.self, HabitCompletion.self, WeeklyDay.self, MonthlyDay.self)
         let tempService = HabitService(modelContext: ModelContext(tempContainer))
         self._viewModel = StateObject(wrappedValue: HabitFormViewModel(habit: habit, habitService: tempService))
     }
@@ -65,8 +65,13 @@ struct HabitFormView: View {
             }
             .alert("Delete Habit?", isPresented: $viewModel.showingDeleteAlert) {
                 Button("Delete", role: .destructive) {
-                    viewModel.deleteHabit()
-                    dismiss()
+                    // Perform delete on background thread to prevent hang
+                    Task.detached(priority: .high) {
+                        await viewModel.deleteHabit()
+                        await MainActor.run {
+                            dismiss()
+                        }
+                    }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -74,8 +79,13 @@ struct HabitFormView: View {
             }
             .alert("Schedule Changed", isPresented: $viewModel.showingScheduleChangeAlert) {
                 Button("Save & Clean", role: .destructive) {
-                    viewModel.confirmScheduleChange()
-                    dismiss()
+                    // Perform save on background thread to prevent hang
+                    Task.detached(priority: .high) {
+                        await viewModel.confirmScheduleChange()
+                        await MainActor.run {
+                            dismiss()
+                        }
+                    }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -84,6 +94,10 @@ struct HabitFormView: View {
         }
         .onAppear {
             // Update the service with the actual model context
+            viewModel.updateModelContext(modelContext)
+        }
+        .task {
+            // Ensure model context is properly initialized
             viewModel.updateModelContext(modelContext)
         }
     }
@@ -266,7 +280,10 @@ struct HabitFormView: View {
     @ViewBuilder
     private var deletePinnedSection: some View {
         if viewModel.isEditMode {
-            Button(action: { viewModel.showingDeleteAlert = true }) {
+            Button(action: { 
+                // Immediate response to prevent hang
+                viewModel.showingDeleteAlert = true 
+            }) {
                 Text("Delete Habit")
                     .font(.headline)
                     .foregroundColor(.red)

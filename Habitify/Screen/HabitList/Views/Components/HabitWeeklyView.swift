@@ -96,8 +96,10 @@ private struct WeekDayView: View {
             }
             .onTapGesture {
                 guard canToggle else { return }
-                withAnimation {
-                    onToggleCompletion()
+                // Immediate response without animation to prevent UI lag
+                onToggleCompletion()
+                // Force immediate state update
+                DispatchQueue.main.async {
                     updateState()
                 }
             }
@@ -118,6 +120,9 @@ private struct WeekDayView: View {
     
     private func updateState() {
         let analysisService = HabitAnalysisService.shared
+        // Force fresh calculation by clearing cache first
+        analysisService.clearCache(for: habit)
+        
         isScheduled = analysisService.isScheduled(habit, on: date)
         isCompleted = analysisService.isCompleted(habit, on: date)
         canToggle = analysisService.canToggleCompletion(habit, on: date)

@@ -18,9 +18,13 @@ final class DateService {
         let startDate = calendar.date(byAdding: .year, value: -2, to: today) ?? today
         let endDate = calendar.date(byAdding: .year, value: 2, to: today) ?? today
         
-        var dates: [Date] = []
-        var currentDate = startDate
+        // Calculate the number of days more efficiently
+        let daysBetween = calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 0
         
+        var dates: [Date] = []
+        dates.reserveCapacity(daysBetween + 1)
+        
+        var currentDate = startDate
         while currentDate <= endDate {
             dates.append(currentDate)
             currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate

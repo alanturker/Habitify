@@ -62,18 +62,17 @@ struct HabitDailyView: View {
                     }
                 }
                 .onTapGesture {
-                    withAnimation(.spring(response: 0.3)) {
-                        onToggleCompletion()
-                    }
+                    // Don't toggle local state, let parent handle it
+                    onToggleCompletion()
                 }
             }
         }
         .padding()
         .background(isCompleted ? Color.green.opacity(0.15) : Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(isCompleted ? Color.green : Color.clear, lineWidth: 2)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }

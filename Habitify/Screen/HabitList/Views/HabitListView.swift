@@ -14,8 +14,9 @@ struct HabitListView: View {
     @StateObject private var viewModel: HabitListViewModel
     
     init() {
-        // Create a temporary service for initialization
-        let tempService = HabitService(modelContext: ModelContext(try! ModelContainer(for: Habit.self, HabitCompletion.self)))
+        // Create a temporary service for initialization - this will be updated in onAppear
+        let tempContainer = try! ModelContainer(for: Habit.self, HabitCompletion.self, WeeklyDay.self, MonthlyDay.self)
+        let tempService = HabitService(modelContext: ModelContext(tempContainer))
         _viewModel = StateObject(wrappedValue: HabitListViewModel(habitService: tempService))
     }
     
@@ -45,7 +46,16 @@ struct HabitListView: View {
             HabitFormView(habit: habit)
         }
         .onAppear {
+            // Update the model context to use the environment context
             viewModel.updateModelContext(modelContext)
+        }
+        .task {
+            // Ensure model context is updated when view appears
+            viewModel.updateModelContext(modelContext)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+            // Clear cache on memory warning
+            HabitAnalysisService.shared.clearCache()
         }
     }
 }
@@ -108,72 +118,44 @@ extension HabitListView {
     var calendarHeaderSection: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                LazyHStack(spacing: 12) {
                     ForEach(viewModel.headerDates, id: \.timeIntervalSince1970) { date in
-                        let isSelected = viewModel.isSameDay(viewModel.selectedDate, date)
-                        let isToday = viewModel.isSameDay(date, Date())
-                        let habitsForDate = viewModel.habitsForDate(habits, on: date)
-                        
-                        VStack(spacing: 4) {
-                            Text(viewModel.weekdayLabel(for: date))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            
-                            Text(viewModel.dayNumber(for: date))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.primary)
-                            
-                            // Habit color dots
-                            if !habitsForDate.isEmpty {
-                                HStack(spacing: 2) {
-                                    ForEach(Array(habitsForDate.prefix(3)), id: \.id) { habit in
-                                        Circle()
-                                            .fill(viewModel.color(for: habit))
-                                            .frame(width: 4, height: 4)
-                                    }
-                                    if habitsForDate.count > 3 {
-                                        Circle()
-                                            .fill(Color.gray)
-                                            .frame(width: 4, height: 4)
-                                    }
-                                }
-                            } else {
-                                Circle()
-                                    .fill(Color.clear)
-                                    .frame(width: 4, height: 4)
-                            }
-                        }
-                        .frame(width: 44, height: 54)
-                        .background(Color.clear)
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.purple, lineWidth: isSelected ? 3 : (isToday ? 1 : 0)))
-                        .id("date-\(date.timeIntervalSince1970)")
-                        .onTapGesture { viewModel.selectDate(date) }
+                        CalendarDateView(
+                            date: date,
+                            isSelected: viewModel.isSameDay(viewModel.selectedDate, date),
+                            isToday: viewModel.isSameDay(date, Date()),
+                            habitsForDate: viewModel.habitsForDate(habits, on: date),
+                            onTap: { viewModel.selectDate(date) },
+                            weekdayLabel: viewModel.weekdayLabel(for: date),
+                            dayNumber: viewModel.dayNumber(for: date),
+                            habitColor: { habit in viewModel.color(for: habit) }
+                        )
                     }
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 4)
             }
+            .frame(height: 70) // Fixed height to prevent excessive vertical space
             .onAppear {
-                // Scroll to today on first load
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                // Scroll to today on first load - use task instead of DispatchQueue
+                Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                     let today = Calendar.current.startOfDay(for: Date())
-                    let todayId = "date-\(today.timeIntervalSince1970)"
                     
                     // Find the exact date in headerDates
                     if let exactToday = viewModel.headerDates.first(where: { Calendar.current.isDate($0, inSameDayAs: today) }) {
                         let exactTodayId = "date-\(exactToday.timeIntervalSince1970)"
-                        withAnimation(.easeInOut(duration: 0.8)) {
-                            proxy.scrollTo(exactTodayId, anchor: .center)
+                        await MainActor.run {
+                            withAnimation(.easeInOut(duration: 0.8)) {
+                                proxy.scrollTo(exactTodayId, anchor: .center)
+                            }
                         }
-                    } else {
-                        print("Today date not found in headerDates")
                     }
                 }
             }
             .onChange(of: viewModel.scrollToToday) { _, shouldScroll in
                 if shouldScroll {
                     let today = Calendar.current.startOfDay(for: Date())
-                    let todayId = "date-\(today.timeIntervalSince1970)"
                     
                     // Find the exact date in headerDates
                     if let exactToday = viewModel.headerDates.first(where: { Calendar.current.isDate($0, inSameDayAs: today) }) {
@@ -181,24 +163,25 @@ extension HabitListView {
                         withAnimation(.easeInOut(duration: 0.8)) {
                             proxy.scrollTo(exactTodayId, anchor: .center)
                         }
-                    } else {
-                        print("Today date not found in headerDates")
                     }
                     
-                    // Reset the flag
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        viewModel.scrollToToday = false
+                    // Reset the flag using Task
+                    Task {
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                        await MainActor.run {
+                            viewModel.scrollToToday = false
+                        }
                     }
                 }
             }
         }
-        .padding(.bottom, 8)
+        .padding(.bottom, 4)
     }
     
     @ViewBuilder
     var listSection: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            LazyVStack(spacing: 12) {
                 if viewModel.selectedTab == .daily {
                     ForEach(viewModel.habitsForDaily(habits, on: viewModel.selectedDate)) { habit in
                         HabitDailyView(
@@ -208,7 +191,12 @@ extension HabitListView {
                             canToggle: viewModel.canToggleCompletion(habit, on: viewModel.selectedDate),
                             streakText: viewModel.streakText(for: habit),
                             habitColor: viewModel.color(for: habit),
-                            onToggleCompletion: { viewModel.toggleCompletion(for: habit, on: viewModel.selectedDate) }
+                            onToggleCompletion: { 
+                                // Clear cache first to ensure fresh calculation
+                                HabitAnalysisService.shared.clearCache(for: habit)
+                                // Immediate UI feedback without waiting for completion
+                                viewModel.toggleCompletion(for: habit, on: viewModel.selectedDate)
+                            }
                         )
                         .onTapGesture { viewModel.selectHabit(habit) }
                     }
@@ -221,7 +209,9 @@ extension HabitListView {
                             isWeekCompleted: viewModel.isWeekFullyCompleted(habit, for: viewModel.selectedDate),
                             streakText: viewModel.streakText(for: habit),
                             habitColor: viewModel.color(for: habit),
-                            onToggleCompletion: { date in viewModel.toggleCompletion(for: habit, on: date) }
+                            onToggleCompletion: { date in 
+                                viewModel.toggleCompletion(for: habit, on: date)
+                            }
                         )
                         .onTapGesture { viewModel.selectHabit(habit) }
                     }
@@ -233,7 +223,9 @@ extension HabitListView {
                             monthDays: viewModel.monthDays,
                             isMonthCompleted: viewModel.isMonthFullyCompleted(habit, for: viewModel.selectedDate),
                             habitColor: viewModel.color(for: habit),
-                            onToggleCompletion: { date in viewModel.toggleCompletion(for: habit, on: date) }
+                            onToggleCompletion: { date in 
+                                viewModel.toggleCompletion(for: habit, on: date)
+                            }
                         )
                         .onTapGesture { viewModel.selectHabit(habit) }
                     }
@@ -242,8 +234,8 @@ extension HabitListView {
                     emptyStateView
                 }
             }
-            .padding(.horizontal)
-            .padding(.bottom, 100)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 80)
         }
     }
     

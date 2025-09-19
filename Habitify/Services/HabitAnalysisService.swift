@@ -12,6 +12,11 @@ final class HabitAnalysisService {
     static let shared = HabitAnalysisService()
     private let calendar = Calendar.current
     
+    // MARK: - Caching
+    private var completionCache: [String: Bool] = [:]
+    private var streakCache: [String: Int] = [:]
+    private var scheduledCache: [String: Bool] = [:]
+    
     private init() {}
     
     // MARK: - Habit Computations
@@ -20,9 +25,12 @@ final class HabitAnalysisService {
     }
     
     func isCompleted(_ habit: Habit, on date: Date) -> Bool {
-        habit.completions.contains { completion in
+        // Always calculate fresh to ensure accuracy
+        let result = habit.completions.contains { completion in
             calendar.isDate(completion.date, inSameDayAs: date)
         }
+        
+        return result
     }
     
     func isCompletedToday(_ habit: Habit, today: Date = Date()) -> Bool {
@@ -32,7 +40,16 @@ final class HabitAnalysisService {
     
     // MARK: - Streak Calculations
     func currentStreak(for habit: Habit, today: Date = Date()) -> Int {
-        guard !habit.completions.isEmpty else { return 0 }
+        let cacheKey = "streak-\(habit.id.uuidString)-\(today.timeIntervalSince1970)"
+        
+        if let cached = streakCache[cacheKey] {
+            return cached
+        }
+        
+        guard !habit.completions.isEmpty else { 
+            streakCache[cacheKey] = 0
+            return 0 
+        }
         
         let startOfToday = calendar.startOfDay(for: today)
         let sortedCompletions = habit.completions.sorted { $0.date > $1.date }
@@ -54,15 +71,28 @@ final class HabitAnalysisService {
             }
         }
         
+        streakCache[cacheKey] = streak
         return streak
     }
     
     func weeklyStreak(for habit: Habit, today: Date = Date()) -> Int {
-        guard !habit.completions.isEmpty else { return 0 }
+        let cacheKey = "weekly-streak-\(habit.id.uuidString)-\(today.timeIntervalSince1970)"
+        
+        if let cached = streakCache[cacheKey] {
+            return cached
+        }
+        
+        guard !habit.completions.isEmpty else { 
+            streakCache[cacheKey] = 0
+            return 0 
+        }
         
         let startOfToday = calendar.startOfDay(for: today)
         let scheduledWeekdays = Set(habit.weeklyDays.map { $0.dayNumber })
-        guard !scheduledWeekdays.isEmpty else { return 0 }
+        guard !scheduledWeekdays.isEmpty else { 
+            streakCache[cacheKey] = 0
+            return 0 
+        }
         
         let weekday = calendar.component(.weekday, from: startOfToday)
         let daysFromMonday = (weekday + 5) % 7
@@ -87,7 +117,10 @@ final class HabitAnalysisService {
         
         // If current week is not fully completed, start from previous week
         if currentCompletedDays.count != currentScheduledDays.count || currentScheduledDays.isEmpty {
-            guard let previousWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: currentWeekStart) else { return 0 }
+            guard let previousWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: currentWeekStart) else { 
+                streakCache[cacheKey] = 0
+                return 0 
+            }
             currentWeekStart = previousWeek
         }
         
@@ -117,6 +150,7 @@ final class HabitAnalysisService {
             }
         }
         
+        streakCache[cacheKey] = streak
         return streak
     }
     
@@ -141,16 +175,26 @@ final class HabitAnalysisService {
     }
     
     func isScheduled(_ habit: Habit, on date: Date) -> Bool {
+        let cacheKey = "\(habit.id.uuidString)-\(date.timeIntervalSince1970)-scheduled"
+        
+        if let cached = scheduledCache[cacheKey] {
+            return cached
+        }
+        
+        let result: Bool
         switch frequency(for: habit) {
         case .daily:
-            return true
+            result = true
         case .weekly:
             let weekday = calendar.component(.weekday, from: date)
-            return habit.weeklyDays.contains { $0.dayNumber == weekday }
+            result = habit.weeklyDays.contains { $0.dayNumber == weekday }
         case .monthly:
             let day = calendar.component(.day, from: date)
-            return habit.monthlyDays.contains { $0.dayNumber == day }
+            result = habit.monthlyDays.contains { $0.dayNumber == day }
         }
+        
+        scheduledCache[cacheKey] = result
+        return result
     }
     
     func canToggleCompletion(_ habit: Habit, on date: Date) -> Bool {
@@ -244,5 +288,46 @@ final class HabitAnalysisService {
     // MARK: - Filtering
     func habitsForDaily(_ habits: [Habit], on date: Date) -> [Habit] {
         habits.filter { isScheduled($0, on: date) }
+    }
+    
+    // MARK: - Cache Management
+    func clearCache() {
+        completionCache.removeAll(keepingCapacity: true)
+        streakCache.removeAll(keepingCapacity: true)
+        scheduledCache.removeAll(keepingCapacity: true)
+    }
+    
+    func clearCache(for habit: Habit) {
+        let habitId = habit.id.uuidString
+        completionCache = completionCache.filter { !$0.key.hasPrefix(habitId) }
+        streakCache = streakCache.filter { !$0.key.hasPrefix(habitId) }
+        scheduledCache = scheduledCache.filter { !$0.key.hasPrefix(habitId) }
+        
+        // Also clear any date-specific caches for this habit
+        let today = Calendar.current.startOfDay(for: Date())
+        let todayKey = "\(habitId)-\(today.timeIntervalSince1970)"
+        completionCache.removeValue(forKey: todayKey)
+        completionCache.removeValue(forKey: "\(todayKey)-scheduled")
+    }
+    
+    // Clear old cache entries to prevent memory buildup
+    func cleanupOldCache() {
+        // Keep only recent entries (last 30 days)
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let cutoffTime = thirtyDaysAgo.timeIntervalSince1970
+        
+        completionCache = completionCache.filter { key, _ in
+            if let timeInterval = Double(key.components(separatedBy: "-").last ?? "0") {
+                return timeInterval >= cutoffTime
+            }
+            return true
+        }
+        
+        scheduledCache = scheduledCache.filter { key, _ in
+            if let timeInterval = Double(key.components(separatedBy: "-").last ?? "0") {
+                return timeInterval >= cutoffTime
+            }
+            return true
+        }
     }
 }

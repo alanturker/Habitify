@@ -49,22 +49,34 @@ final class HabitFormViewModel: ObservableObject {
             if hasScheduleChanged(habit: habit, newFrequency: frequency, newWeeklyDays: weeklyDays, newMonthlyDays: monthlyDays) {
                 showingScheduleChangeAlert = true
             } else {
-                performSave(weeklyDays: weeklyDays, monthlyDays: monthlyDays)
+                Task(priority: .userInitiated) {
+                    await performSave(weeklyDays: weeklyDays, monthlyDays: monthlyDays)
+                }  
             }
         } else {
-            habitService.createHabit(name: habitName, colorHex: selectedColor, iconName: selectedIcon, frequency: frequency, weeklyDays: weeklyDays, monthlyDays: monthlyDays)
+            // Perform on background thread
+            Task.detached(priority: .userInitiated) {
+                await self.habitService.createHabit(name: self.habitName, colorHex: self.selectedColor, iconName: self.selectedIcon, frequency: self.frequency, weeklyDays: weeklyDays, monthlyDays: monthlyDays)
+            }
         }
     }
     
-    func confirmScheduleChange() {
+    func confirmScheduleChange() async {
         let weeklyDays = Array(selectedWeekdays.map { $0.rawValue }).sorted()
         let monthlyDays = extractMonthDays(from: monthlySelectedDates)
-        performSave(weeklyDays: weeklyDays, monthlyDays: monthlyDays)
+        await performSave(weeklyDays: weeklyDays, monthlyDays: monthlyDays)
     }
     
-    func deleteHabit() {
+    func deleteHabit() async {
         guard let habit = habit else { return }
-        habitService.deleteHabit(habit)
+        
+        // Ensure model context is ready before delete
+        await MainActor.run {
+            // Force context update
+            _ = habit.completions.count
+        }
+        
+        await habitService.deleteHabit(habit)
     }
     
     func selectDefaultHabit(_ defaultHabit: DefaultHabit) {
@@ -73,10 +85,9 @@ final class HabitFormViewModel: ObservableObject {
     }
     
     func selectFrequency(_ newFrequency: Frequency) {
-        withAnimation {
-            frequency = newFrequency
-            originalFrequency = newFrequency
-        }
+        // Immediate response without animation to prevent gesture timeout
+        frequency = newFrequency
+        originalFrequency = newFrequency
     }
     
     func toggleWeekday(_ day: Weekday) {
@@ -167,15 +178,15 @@ final class HabitFormViewModel: ObservableObject {
         return false
     }
     
-    private func performSave(weeklyDays: [Int], monthlyDays: [Int]) {
+    private func performSave(weeklyDays: [Int], monthlyDays: [Int]) async {
         if let habit = habit {
             // Clean up old completions that are no longer scheduled
             cleanUpOldCompletions(habit: habit, newFrequency: frequency, newWeeklyDays: weeklyDays, newMonthlyDays: monthlyDays)
             
-            // Update the habit
-            habitService.updateHabit(habit, name: habitName, colorHex: selectedColor, iconName: selectedIcon, frequency: frequency, weeklyDays: weeklyDays, monthlyDays: monthlyDays)
+            // Update the habit on background thread
+            await habitService.updateHabit(habit, name: habitName, colorHex: selectedColor, iconName: selectedIcon, frequency: frequency, weeklyDays: weeklyDays, monthlyDays: monthlyDays)
         } else {
-            habitService.createHabit(name: habitName, colorHex: selectedColor, iconName: selectedIcon, frequency: frequency, weeklyDays: weeklyDays, monthlyDays: monthlyDays)
+            await habitService.createHabit(name: habitName, colorHex: selectedColor, iconName: selectedIcon, frequency: frequency, weeklyDays: weeklyDays, monthlyDays: monthlyDays)
         }
     }
     

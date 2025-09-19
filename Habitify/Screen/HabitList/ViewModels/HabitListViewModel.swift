@@ -23,6 +23,12 @@ final class HabitListViewModel: ObservableObject {
     private let dateService = DateService.shared
     private let habitService: HabitService
     
+    // MARK: - Caching Properties
+    private var cachedHeaderDates: [Date]?
+    private var cachedWeekDays: [Date]?
+    private var cachedMonthDays: [Date]?
+    private var lastCachedDate: Date?
+    
     // MARK: - Initialization
     init(habitService: HabitService) {
         self.habitService = habitService
@@ -30,15 +36,32 @@ final class HabitListViewModel: ObservableObject {
     
     // MARK: - Computed Properties
     var headerDates: [Date] {
-        dateService.lifetimeDates()
+        if let cached = cachedHeaderDates {
+            return cached
+        }
+        let dates = dateService.lifetimeDates()
+        cachedHeaderDates = dates
+        return dates
     }
     
     var weekDays: [Date] {
-        dateService.weekDays(for: selectedDate)
+        if let cached = cachedWeekDays, lastCachedDate == selectedDate {
+            return cached
+        }
+        let dates = dateService.weekDays(for: selectedDate)
+        cachedWeekDays = dates
+        lastCachedDate = selectedDate
+        return dates
     }
     
     var monthDays: [Date] {
-        dateService.monthDays(for: selectedDate)
+        if let cached = cachedMonthDays, lastCachedDate == selectedDate {
+            return cached
+        }
+        let dates = dateService.monthDays(for: selectedDate)
+        cachedMonthDays = dates
+        lastCachedDate = selectedDate
+        return dates
     }
     
     // MARK: - UI Actions
@@ -51,22 +74,29 @@ final class HabitListViewModel: ObservableObject {
     }
     
     func selectTab(_ tab: Frequency) {
-        withAnimation(.spring(response: 0.3)) {
-            selectedTab = tab
-        }
+        // Immediate response without animation to prevent gesture timeout
+        selectedTab = tab
     }
     
     func selectDate(_ date: Date) {
-        withAnimation(.spring(response: 0.3)) {
-            selectedDate = Calendar.current.startOfDay(for: date)
+        let newDate = Calendar.current.startOfDay(for: date)
+        if newDate != selectedDate {
+            // Clear cache when date changes
+            cachedWeekDays = nil
+            cachedMonthDays = nil
+            
+            // Clear analysis cache to force fresh calculation
+            HabitAnalysisService.shared.clearCache()
+            
+            // Immediate response without animation to prevent gesture timeout
+            selectedDate = newDate
         }
     }
     
     func scrollToCurrentDay() {
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-            selectedDate = Calendar.current.startOfDay(for: Date())
-            scrollToToday = true
-        }
+        // Immediate response without animation to prevent gesture timeout
+        selectedDate = Calendar.current.startOfDay(for: Date())
+        scrollToToday = true
     }
     
     func updateModelContext(_ newContext: ModelContext) {
@@ -177,7 +207,16 @@ final class HabitListViewModel: ObservableObject {
     
     // MARK: - Habit Actions
     func toggleCompletion(for habit: Habit, on date: Date) {
-        habitService.toggleCompletion(for: habit, on: date)
+        // Perform immediately on background thread with high priority
+        Task.detached(priority: .high) {
+            await self.habitService.toggleCompletion(for: habit, on: date)
+            
+            // Force UI update on main thread
+            await MainActor.run {
+                // This will trigger UI refresh
+                _ = habit.completions.count
+            }
+        }
     }
 }
 

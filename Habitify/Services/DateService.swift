@@ -13,12 +13,20 @@ final class DateService {
     
     private init() {}
     
-    // MARK: - Date Calculations
-    func headerDates(centeredAround date: Date = Date(), left: Int = 14, right: Int = 14) -> [Date] {
-        let today = calendar.startOfDay(for: date)
-        return (-left...right).compactMap { offset in
-            calendar.date(byAdding: .day, value: offset, to: today)
+    func lifetimeDates() -> [Date] {
+        let today = calendar.startOfDay(for: Date())
+        let startDate = calendar.date(byAdding: .year, value: -2, to: today) ?? today
+        let endDate = calendar.date(byAdding: .year, value: 2, to: today) ?? today
+        
+        var dates: [Date] = []
+        var currentDate = startDate
+        
+        while currentDate <= endDate {
+            dates.append(currentDate)
+            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
         }
+        
+        return dates
     }
     
     func weekDays(for date: Date) -> [Date] {

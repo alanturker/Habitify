@@ -40,7 +40,7 @@ struct CalendarMonthView: View {
             
             // Grid of days
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 6) {
-                ForEach(monthGrid(), id: \.self) { date in
+                ForEach(Array(monthGrid().enumerated()), id: \.offset) { index, date in
                     if let date = date {
                         let isSelected = selectedDates.contains(date)
                         Text("\(Calendar.current.component(.day, from: date))")

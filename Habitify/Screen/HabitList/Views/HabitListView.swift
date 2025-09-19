@@ -109,21 +109,44 @@ extension HabitListView {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(viewModel.headerDates, id: \.self) { date in
+                    ForEach(viewModel.headerDates, id: \.timeIntervalSince1970) { date in
                         let isSelected = viewModel.isSameDay(viewModel.selectedDate, date)
                         let isToday = viewModel.isSameDay(date, Date())
+                        let habitsForDate = viewModel.habitsForDate(habits, on: date)
+                        
                         VStack(spacing: 4) {
                             Text(viewModel.weekdayLabel(for: date))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
+                            
                             Text(viewModel.dayNumber(for: date))
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(.primary)
+                            
+                            // Habit color dots
+                            if !habitsForDate.isEmpty {
+                                HStack(spacing: 2) {
+                                    ForEach(Array(habitsForDate.prefix(3)), id: \.id) { habit in
+                                        Circle()
+                                            .fill(viewModel.color(for: habit))
+                                            .frame(width: 4, height: 4)
+                                    }
+                                    if habitsForDate.count > 3 {
+                                        Circle()
+                                            .fill(Color.gray)
+                                            .frame(width: 4, height: 4)
+                                    }
+                                }
+                            } else {
+                                Circle()
+                                    .fill(Color.clear)
+                                    .frame(width: 4, height: 4)
+                            }
                         }
                         .frame(width: 44, height: 54)
                         .background(Color.clear)
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.purple, lineWidth: isSelected ? 3 : (isToday ? 1 : 0)))
-                        .id(date.timeIntervalSince1970)
+                        .id("date-\(date.timeIntervalSince1970)")
                         .onTapGesture { viewModel.selectDate(date) }
                     }
                 }
@@ -131,15 +154,37 @@ extension HabitListView {
                 .padding(.vertical, 8)
             }
             .onAppear {
-                let dates = viewModel.headerDates
-                if let today = dates.first(where: { viewModel.isSameDay($0, Date()) }) {
-                    proxy.scrollTo(today.timeIntervalSince1970, anchor: .center)
+                // Scroll to today on first load
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let today = Calendar.current.startOfDay(for: Date())
+                    let todayId = "date-\(today.timeIntervalSince1970)"
+                    
+                    // Find the exact date in headerDates
+                    if let exactToday = viewModel.headerDates.first(where: { Calendar.current.isDate($0, inSameDayAs: today) }) {
+                        let exactTodayId = "date-\(exactToday.timeIntervalSince1970)"
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            proxy.scrollTo(exactTodayId, anchor: .center)
+                        }
+                    } else {
+                        print("Today date not found in headerDates")
+                    }
                 }
             }
             .onChange(of: viewModel.scrollToToday) { _, shouldScroll in
                 if shouldScroll {
-                    let today = Date()
-                    proxy.scrollTo(today.timeIntervalSince1970, anchor: .center)
+                    let today = Calendar.current.startOfDay(for: Date())
+                    let todayId = "date-\(today.timeIntervalSince1970)"
+                    
+                    // Find the exact date in headerDates
+                    if let exactToday = viewModel.headerDates.first(where: { Calendar.current.isDate($0, inSameDayAs: today) }) {
+                        let exactTodayId = "date-\(exactToday.timeIntervalSince1970)"
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            proxy.scrollTo(exactTodayId, anchor: .center)
+                        }
+                    } else {
+                        print("Today date not found in headerDates")
+                    }
+                    
                     // Reset the flag
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         viewModel.scrollToToday = false

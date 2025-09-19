@@ -266,20 +266,17 @@ struct HabitFormView: View {
     @ViewBuilder
     private var deletePinnedSection: some View {
         if viewModel.isEditMode {
-            VStack {
-                Spacer()
-                Button(action: { viewModel.showingDeleteAlert = true }) {
-                    Text("Delete Habit")
-                        .font(.headline)
-                        .foregroundColor(.red)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 30)
+            Button(action: { viewModel.showingDeleteAlert = true }) {
+                Text("Delete Habit")
+                    .font(.headline)
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            .padding(.horizontal)
+            .padding(.bottom, 30)
         }
     }
 

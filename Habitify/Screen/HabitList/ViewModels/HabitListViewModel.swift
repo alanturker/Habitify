@@ -30,7 +30,7 @@ final class HabitListViewModel: ObservableObject {
     
     // MARK: - Computed Properties
     var headerDates: [Date] {
-        dateService.headerDates(centeredAround: selectedDate)
+        dateService.lifetimeDates()
     }
     
     var weekDays: [Date] {
@@ -145,6 +145,12 @@ final class HabitListViewModel: ObservableObject {
         }
     }
     
+    func habitsForDate(_ habits: [Habit], on date: Date) -> [Habit] {
+        return habits.filter { habit in
+            analysisService.isScheduled(habit, on: date)
+        }
+    }
+    
     // MARK: - Date Utilities
     func isSameDay(_ lhs: Date, _ rhs: Date) -> Bool {
         dateService.isSameDay(lhs, rhs)
@@ -174,3 +180,4 @@ final class HabitListViewModel: ObservableObject {
         habitService.toggleCompletion(for: habit, on: date)
     }
 }
+
